@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 /// Palet warna utama aplikasi Barber Flow (Tema Modern Clean - Merah & Putih).
 class AppColors {
@@ -14,6 +15,7 @@ ThemeData buildAppTheme() {
   return ThemeData(
     useMaterial3: true,
     scaffoldBackgroundColor: AppColors.bg,
+    textTheme: GoogleFonts.poppinsTextTheme(),
     colorScheme: ColorScheme.fromSeed(
       seedColor: AppColors.primary,
       primary: AppColors.primary,

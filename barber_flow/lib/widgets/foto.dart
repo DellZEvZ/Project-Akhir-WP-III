@@ -1,7 +1,10 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:shimmer/shimmer.dart';
 import '../theme.dart';
 
-/// Menampilkan gambar dari URL dengan fallback ikon jika kosong / gagal dimuat.
+/// Menampilkan gambar dari URL (di-cache) dengan efek shimmer saat memuat
+/// dan fallback ikon jika kosong / gagal dimuat.
 class Foto extends StatelessWidget {
   final String? url;
   final double? width;
@@ -25,26 +28,24 @@ class Foto extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Tidak ada foto → tampilkan ikon fallback (hindari Image.network(null)).
+    // Tidak ada foto → tampilkan ikon fallback.
     if (url == null || url!.isEmpty) return _fallback();
 
-    return Image.network(
-      url!,
+    return CachedNetworkImage(
+      imageUrl: url!,
       width: width ?? double.infinity,
       height: height,
       fit: BoxFit.cover,
-      loadingBuilder: (context, child, progress) {
-        if (progress == null) return child;
-        return Container(
+      placeholder: (context, _) => Shimmer.fromColors(
+        baseColor: Colors.grey.shade300,
+        highlightColor: Colors.grey.shade100,
+        child: Container(
           width: width ?? double.infinity,
           height: height,
-          color: AppColors.dark,
-          child: const Center(
-            child: CircularProgressIndicator(color: AppColors.primary, strokeWidth: 2),
-          ),
-        );
-      },
-      errorBuilder: (context, error, stack) => _fallback(),
+          color: Colors.white,
+        ),
+      ),
+      errorWidget: (context, _, _) => _fallback(),
     );
   }
 }

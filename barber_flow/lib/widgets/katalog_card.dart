@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../theme.dart';
 import 'foto.dart';
 
@@ -30,6 +31,10 @@ class KatalogCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return _kartu().animate().fadeIn(duration: 350.ms).slideY(begin: 0.08, end: 0);
+  }
+
+  Widget _kartu() {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:shimmer/shimmer.dart';
 import '../theme.dart';
 import '../services/catalog_service.dart';
 import '../widgets/foto.dart';
@@ -33,7 +35,7 @@ class _BerandaPageState extends State<BerandaPage> {
         future: _future,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const _BerandaSkeleton();
           }
 
           final semuaLayanan = snapshot.data ?? [];
@@ -88,12 +90,57 @@ class _BerandaPageState extends State<BerandaPage> {
                 ),
                 itemBuilder: (context, index) {
                   final paket = paketUnggulan[index];
-                  return _PaketCard(paket: paket);
+                  return _PaketCard(paket: paket)
+                      .animate()
+                      .fadeIn(delay: (80 * index).ms, duration: 400.ms)
+                      .slideY(begin: 0.1, end: 0, curve: Curves.easeOut);
                 },
               ),
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+/// Kerangka shimmer yang meniru susunan Beranda selama data dimuat.
+class _BerandaSkeleton extends StatelessWidget {
+  const _BerandaSkeleton();
+
+  Widget _kotak({double? height, double radius = 10}) => Container(
+        height: height,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(radius),
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey.shade300,
+      highlightColor: Colors.grey.shade100,
+      child: ListView(
+        physics: const NeverScrollableScrollPhysics(),
+        children: [
+          _kotak(height: 180, radius: 0),
+          const SizedBox(height: 20),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: SizedBox(width: 140, child: _kotak(height: 20)),
+          ),
+          GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(12),
+            crossAxisCount: 2,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            childAspectRatio: 0.85,
+            children: List.generate(4, (_) => _kotak()),
+          ),
+        ],
       ),
     );
   }
