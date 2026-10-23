@@ -13,7 +13,10 @@ COPY composer.json composer.lock ./
 RUN composer install --no-dev --no-scripts --no-autoloader --prefer-dist --ignore-platform-req=php
 
 # Stage 3: Final runtime image
-FROM php:8.2-apache
+# Dikunci ke 8.2.35 (patch PHP2Shell, CVE-2026-109618 & CVE-2026-109619).
+# Mengganti tag ini juga memaksa build menarik image dasar baru, tidak memakai
+# lapisan cache lama. Naikkan secara berkala (cek php.net / hub.docker.com).
+FROM php:8.2.35-apache
 
 # Install system dependencies & PHP extensions
 RUN apt-get update && apt-get install -y \
