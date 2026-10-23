@@ -10,6 +10,7 @@ use App\Models\Layanan;
 use App\Models\Produk;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\DB;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -28,8 +29,10 @@ class AppServiceProvider extends ServiceProvider
     {
         // Data katalog berubah (lewat panel admin) -> cache katalog API dibuat usang.
         foreach ([Layanan::class, Produk::class, Barber::class, Galeri::class, Kategori::class] as $model) {
-            $model::saved(fn () => CatalogApiController::bumpCacheVersion());
-            $model::deleted(fn () => CatalogApiController::bumpCacheVersion());
+            // afterCommit: cache baru tidak boleh terisi ulang dengan data lama
+            // sebelum transaksi selesai.
+            $model::saved(fn () => DB::afterCommit(fn () => CatalogApiController::forgetCache()));
+            $model::deleted(fn () => DB::afterCommit(fn () => CatalogApiController::forgetCache()));
         }
 
         // Register custom Blade directive for permission check

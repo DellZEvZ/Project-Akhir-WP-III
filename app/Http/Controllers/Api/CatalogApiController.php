@@ -15,43 +15,87 @@ class CatalogApiController extends Controller
     /** Lama cache katalog publik (detik). */
     private const CACHE_TTL = 300;
 
+    /** Key cache daftar katalog (dihapus saat data berubah). */
+    private const CACHE_KEYS = ['layanan', 'produk', 'barber', 'galeri'];
+
     private function ok($data, string $message = 'OK')
     {
         return response()->json(['success' => true, 'data' => $data, 'message' => $message]);
     }
 
     /**
-     * Naikkan versi cache katalog. Dipanggil saat Layanan/Produk/Barber/Galeri/
-     * Kategori berubah (lihat AppServiceProvider) agar app mobile melihat data baru.
+     * Hapus cache katalog. Dipanggil saat Layanan/Produk/Barber/Galeri/Kategori
+     * berubah (lihat AppServiceProvider) agar app mobile melihat data baru.
+     * Kegagalan cache tidak boleh menggagalkan penyimpanan data di panel admin.
      */
-    public static function bumpCacheVersion(): void
+    public static function forgetCache(): void
     {
-        $store = Cache::store('file');
-        $store->forever('catalog:version', (int) $store->get('catalog:version', 1) + 1);
+        try {
+            foreach (self::CACHE_KEYS as $key) {
+                Cache::store('file')->forget("catalog:{$key}");
+            }
+        } catch (\Throwable $e) {
+            report($e);
+        }
     }
 
     /**
-     * Cache hasil katalog di store 'file' (bukan database): saat cache hangat,
-     * endpoint publik tidak membuka koneksi database sama sekali. Permintaan
-     * dengan filter pencarian tidak di-cache agar key tidak membengkak.
+     * Daftar katalog dengan cache di store 'file' (bukan database): saat cache
+     * hangat, endpoint publik tidak membuka koneksi database sama sekali.
+     *
+     * Cache HANYA menyimpan path gambar relatif. URL absolut dibuat per-request
+     * di sini, supaya header Host / X-Forwarded-Host palsu dari satu request
+     * tidak ikut tersimpan dan disajikan ke pengguna lain (cache poisoning).
+     * Permintaan dengan filter pencarian tidak di-cache agar key tidak membengkak.
      */
     private function cached(Request $request, string $key, \Closure $fn)
     {
         if ($request->filled('search')) {
-            return $fn();
+            $rows = $fn();
+        } else {
+            $store = Cache::store('file');
+            $cacheKey = "catalog:{$key}";
+
+            try {
+                $rows = $store->get($cacheKey);
+            } catch (\Throwable $e) {
+                report($e);
+                $rows = null;
+            }
+
+            if ($rows === null) {
+                $rows = $fn();
+                try {
+                    $store->put($cacheKey, $rows, self::CACHE_TTL);
+                } catch (\Throwable $e) {
+                    report($e);
+                }
+            }
         }
 
-        $store = Cache::store('file');
-        $version = $store->get('catalog:version', 1);
+        return collect($rows)->map(
+            fn ($row) => array_merge($row, ['gambar' => $this->absoluteUrl($row['gambar'])])
+        );
+    }
 
-        return $store->remember("catalog:v{$version}:{$key}", self::CACHE_TTL, $fn);
+    /** Path gambar relatif (atau URL penuh bila sudah URL), tanpa host. */
+    private function imgPath(?string $folder, ?string $foto): ?string
+    {
+        if (!$foto) return null;
+        if (str_starts_with($foto, 'http')) return $foto;
+        return "storage/{$folder}/{$foto}";
+    }
+
+    private function absoluteUrl(?string $path): ?string
+    {
+        if (!$path) return null;
+        if (str_starts_with($path, 'http')) return $path;
+        return asset($path);
     }
 
     private function img(?string $folder, ?string $foto): ?string
     {
-        if (!$foto) return null;
-        if (str_starts_with($foto, 'http')) return $foto;
-        return asset("storage/{$folder}/{$foto}");
+        return $this->absoluteUrl($this->imgPath($folder, $foto));
     }
 
     public function layanan(Request $request)
@@ -68,8 +112,8 @@ class CatalogApiController extends Controller
                 'harga'     => (int) $l->harga,
                 'durasi'    => $l->durasi_menit,
                 'deskripsi' => $l->deskripsi,
-                'gambar'    => $this->img('img-layanan', $l->foto),
-            ]);
+                'gambar'    => $this->imgPath('img-layanan', $l->foto),
+            ])->all();
         });
 
         return $this->ok($data);
@@ -108,8 +152,8 @@ class CatalogApiController extends Controller
                 'berat'     => $p->berat,
                 'kategori'  => $p->kategori->nama_kategori ?? '-',
                 'deskripsi' => $p->detail,
-                'gambar'    => $this->img('img-produk', $p->foto),
-            ]);
+                'gambar'    => $this->imgPath('img-produk', $p->foto),
+            ])->all();
         });
 
         return $this->ok($data);
@@ -141,8 +185,8 @@ class CatalogApiController extends Controller
             'nama'         => $b->nama,
             'spesialisasi' => $b->spesialisasi,
             'pengalaman'   => $b->pengalaman_tahun,
-            'gambar'       => $this->img('img-barber', $b->foto),
-        ]));
+            'gambar'       => $this->imgPath('img-barber', $b->foto),
+        ])->all());
 
         return $this->ok($data);
     }
@@ -154,8 +198,8 @@ class CatalogApiController extends Controller
             'judul'      => $g->judul,
             'tipe'       => $g->tipe,
             'keterangan' => $g->keterangan,
-            'gambar'     => $this->img('img-galeri', $g->foto),
-        ]));
+            'gambar'     => $this->imgPath('img-galeri', $g->foto),
+        ])->all());
 
         return $this->ok($data);
     }
