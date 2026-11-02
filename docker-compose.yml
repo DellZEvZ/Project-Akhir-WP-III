@@ -11,11 +11,14 @@ services:
       - "8000:80"
     environment:
       APP_NAME: ${APP_NAME:-BarberFlow}
-      APP_ENV: ${APP_ENV:-production}
+      # APP_ENV dan APP_DEBUG SENGAJA dikunci (tanpa ${...}) agar variabel dari
+      # panel deploy tidak bisa menyalakan debug di produksi. APP_DEBUG=true
+      # membuka rute quick-login (login admin tanpa password) dan stack trace.
+      APP_ENV: production
       # APP_KEY di-set eksplisit agar konsisten antar restart/redeploy. Untuk
       # produksi nyata, override lewat environment variable platform deploy.
       APP_KEY: ${APP_KEY:-base64:AMGr55gxQLgfvGdu5mulNDJysOE3fNLv0HVdUE9cQsA=}
-      APP_DEBUG: ${APP_DEBUG:-false}
+      APP_DEBUG: "false"
       APP_URL: ${APP_URL:-http://localhost:8000}
 
       # ==== MySQL EKSTERNAL — WAJIB diisi (tidak ada default host) ====
@@ -32,8 +35,9 @@ services:
       # SETIAP request. Driver "file" menulis ke volume storage -> ~0 ms.
       # Catatan: "file" hanya cocok untuk SATU container app. Kalau nanti
       # di-scale ke banyak container, pindahkan ke "redis" (bersama).
-      SESSION_DRIVER: ${SESSION_DRIVER:-file}
-      CACHE_STORE: ${CACHE_STORE:-file}
+      # Dikunci ke file (bukan ${...}) supaya override panel tidak mengembalikan ke database.
+      SESSION_DRIVER: file
+      CACHE_STORE: file
       QUEUE_CONNECTION: ${QUEUE_CONNECTION:-database}
 
       # Redis eksternal (dipakai hanya jika driver di atas di-set "redis").
