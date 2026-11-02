@@ -485,7 +485,7 @@
                                     </div>
                                 </div>
                                 <a class="dropdown-item" href="{{ route('backend.profil.index') }}"><i class="mdi mdi-account m-r-5 m-l-5"></i> Profil Saya</a>
-                                @if(config('app.debug'))
+                                @if(app()->isLocal() && config('app.debug'))
                                 <a class="dropdown-item" href="#" id="btn-quick-login-dashboard"><i class="mdi mdi-account-switch m-r-5 m-l-5"></i> Quick Login</a>
                                 @endif
                                 <a class="dropdown-item" href="{{ route('backend.setting.bantuan') }}"><i class="mdi mdi-help-circle m-r-5 m-l-5"></i> Bantuan</a>

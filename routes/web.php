@@ -98,10 +98,15 @@ Route::post('backend/logout', [LoginController::class, 'logoutBackend'])
     ->name('backend.logout');
 
 // ========== QUICK LOGIN API (Testing Only - No Auth Required) ==========
-Route::get('api/quick-login/users', [QuickLoginController::class, 'getUsersList'])
-    ->name('api.quick-login.users');
-Route::post('backend/quick-login/{userId}', [QuickLoginController::class, 'loginAs'])
-    ->name('backend.quick-login.login-as');
+// Login admin tanpa password: rute HANYA didaftarkan di environment lokal.
+// Tidak cukup bergantung pada APP_DEBUG, karena variabel itu bisa tertimpa
+// oleh konfigurasi server dan membuka akses admin ke siapa pun.
+if (app()->isLocal()) {
+    Route::get('api/quick-login/users', [QuickLoginController::class, 'getUsersList'])
+        ->name('api.quick-login.users');
+    Route::post('backend/quick-login/{userId}', [QuickLoginController::class, 'loginAs'])
+        ->name('backend.quick-login.login-as');
+}
 
 Route::resource('backend/user', UserController::class, ['as' => 'backend'])
     ->middleware('auth');
