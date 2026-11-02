@@ -16,6 +16,7 @@ Route::get('/galeri',       [CatalogApiController::class, 'galeri']);
 // Auth customer
 Route::post('/register', [CustomerApiController::class, 'register']);
 Route::post('/login',    [CustomerApiController::class, 'login']);
+Route::post('/login/google', [CustomerApiController::class, 'google']);
 
 // ===== Terproteksi (Bearer token) =====
 Route::middleware('auth:sanctum')->group(function () {
@@ -27,6 +28,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/booking',         [BookingApiController::class, 'store']);
     Route::post('/booking/produk',  [BookingApiController::class, 'storeProduk']);
     Route::get('/booking/{id}',     [BookingApiController::class, 'show']);
+    Route::put('/booking/{id}',     [BookingApiController::class, 'update']);
+    Route::delete('/booking/{id}',  [BookingApiController::class, 'destroy']);
     Route::post('/booking/{id}/pay', [BookingApiController::class, 'pay']);
 
     Route::get('/shipping/search',  [BookingApiController::class, 'searchShipping']);

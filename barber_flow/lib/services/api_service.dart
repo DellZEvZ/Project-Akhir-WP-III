@@ -49,6 +49,24 @@ class ApiService {
     });
   }
 
+  static Future<dynamic> put(String path, Map body, {bool auth = false}) async {
+    return _safeCall(() async {
+      final res = await http
+          .put(_uri(path), headers: await _headers(auth: auth), body: jsonEncode(body))
+          .timeout(const Duration(seconds: AppConfig.timeoutSeconds));
+      return _decode(res);
+    });
+  }
+
+  static Future<dynamic> delete(String path, {bool auth = false}) async {
+    return _safeCall(() async {
+      final res = await http
+          .delete(_uri(path), headers: await _headers(auth: auth))
+          .timeout(const Duration(seconds: AppConfig.timeoutSeconds));
+      return _decode(res);
+    });
+  }
+
   static Future<dynamic> post(String path, Map body, {bool auth = false}) async {
     return _safeCall(() async {
       final res = await http

@@ -36,10 +36,17 @@ class AppConfig {
   static const bool useBackend = true;
 
   // ↓ Ganti sesuai mode yang dipakai saat ini
-  static const String baseUrl = 'http://localhost:8000/api'; // MODE 1 (USB)
+  static const String baseUrl = 'https://barbershop.seretia.link/api'; // PRODUKSI
+  // static const String baseUrl = 'http://localhost:8000/api'; // MODE 1 (USB)
   // static const String baseUrl = 'http://10.0.2.2:8000/api';   // MODE 2 (Emulator)
   // static const String baseUrl = 'http://192.168.1.X:8000/api'; // MODE 3 (WiFi) ← ganti IP
   // static const String baseUrl = 'http://127.0.0.1:8000/api';  // MODE 4 (Desktop)
+
+  /// Client ID tipe "Web application" dari Google Cloud (sama dengan
+  /// GOOGLE_CLIENT_ID di backend). Dipakai sebagai serverClientId agar Google
+  /// Sign-In native menghasilkan ID token yang diterima backend.
+  static const String googleServerClientId =
+      '109216385554-sibhjnv8pepvnnfc8a9itek7399d734p.apps.googleusercontent.com';
 
   /// Timeout permintaan HTTP (detik).
   static const int timeoutSeconds = 15;

@@ -22,6 +22,44 @@ class BookingService {
     return list.map((e) => Map<String, dynamic>.from(e)).toList();
   }
 
+  /// Ubah jadwal booking (tanggal, jam, catatan). Server menolak bila bentrok,
+  /// sudah dibayar, atau bukan booking layanan.
+  static Future<Map<String, dynamic>> updateBooking(
+    int orderId, {
+    required String tanggal,
+    required String jam,
+    String catatan = '',
+  }) async {
+    if (_offlineMode) {
+      final idx = _orders.indexWhere((o) => o['id'] == orderId);
+      if (idx == -1) throw ApiException('Booking tidak ditemukan.');
+      _orders[idx] = {
+        ..._orders[idx],
+        'tanggal_booking': tanggal,
+        'jam_booking': jam,
+        'catatan': catatan,
+      };
+      return Map<String, dynamic>.from(_orders[idx]);
+    }
+    final res = await ApiService.put('/booking/$orderId', {
+      'tanggal_booking': tanggal,
+      'jam_booking': jam,
+      'catatan': catatan,
+    }, auth: true);
+    return Map<String, dynamic>.from(res['data']);
+  }
+
+  /// Batalkan pesanan (status jadi "batal", data tetap tercatat di admin).
+  static Future<void> cancelBooking(int orderId) async {
+    if (_offlineMode) {
+      final idx = _orders.indexWhere((o) => o['id'] == orderId);
+      if (idx == -1) throw ApiException('Pesanan tidak ditemukan.');
+      _orders[idx] = {..._orders[idx], 'status': 'batal', 'status_label': 'Dibatalkan'};
+      return;
+    }
+    await ApiService.delete('/booking/$orderId', auth: true);
+  }
+
   static Future<Map<String, dynamic>> createBooking({
     required List<int> layananIds,
     required int barberId,

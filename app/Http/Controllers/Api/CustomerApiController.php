@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Customer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
 
 class CustomerApiController extends Controller
@@ -67,6 +68,68 @@ class CustomerApiController extends Controller
             'success' => true,
             'data'    => $this->payload($customer, $token),
             'message' => 'Login berhasil',
+        ]);
+    }
+
+    /**
+     * Login/registrasi lewat Google untuk app mobile.
+     *
+     * App mengirim ID token dari Google Sign-In native. Token diverifikasi ke
+     * Google (tokeninfo), lalu audience-nya HARUS salah satu client ID kita,
+     * supaya token milik aplikasi lain tidak bisa dipakai masuk ke sini.
+     */
+    public function google(Request $request)
+    {
+        $request->validate(['id_token' => 'required|string']);
+
+        $res = Http::timeout(10)->get('https://oauth2.googleapis.com/tokeninfo', [
+            'id_token' => $request->id_token,
+        ]);
+
+        $info = $res->json();
+        $allowedAud = array_filter([
+            config('services.google.client_id'),
+            env('GOOGLE_ANDROID_CLIENT_ID'),
+        ]);
+
+        if (
+            !$res->ok()
+            || !in_array($info['aud'] ?? null, $allowedAud, true)
+            || !in_array($info['iss'] ?? null, ['accounts.google.com', 'https://accounts.google.com'], true)
+            || ($info['email_verified'] ?? 'false') !== 'true'
+            || empty($info['sub']) || empty($info['email'])
+        ) {
+            throw ValidationException::withMessages([
+                'id_token' => ['Token Google tidak valid.'],
+            ]);
+        }
+
+        // Cocokkan google_id, lalu email (menautkan akun yang dibuat lewat
+        // email/password), baru buat akun baru.
+        $customer = Customer::where('google_id', $info['sub'])->first()
+            ?? Customer::where('email', $info['email'])->first();
+
+        if ($customer) {
+            $customer->google_id = $customer->google_id ?: $info['sub'];
+            if (!$customer->foto && !empty($info['picture'])) {
+                $customer->foto = $info['picture'];
+            }
+            $customer->save();
+        } else {
+            $customer = Customer::create([
+                'nama'      => $info['name'] ?? $info['email'],
+                'email'     => $info['email'],
+                'google_id' => $info['sub'],
+                'foto'      => $info['picture'] ?? null,
+            ]);
+        }
+
+        $token = $customer->createToken('mobile')->plainTextToken;
+
+        return response()->json([
+            'success' => true,
+            'data'    => $this->payload($customer, $token),
+            'message' => 'Login Google berhasil',
         ]);
     }
 

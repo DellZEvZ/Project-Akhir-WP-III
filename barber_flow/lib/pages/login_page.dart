@@ -49,6 +49,25 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  Future<void> _google() async {
+    setState(() => _loading = true);
+    final error = await AuthService.loginWithGoogle();
+    if (!mounted) return;
+    setState(() => _loading = false);
+
+    if (error == null) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const MainPage()),
+        (route) => false,
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error), backgroundColor: Colors.red),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -106,6 +125,12 @@ class _LoginPageState extends State<LoginPage> {
                         ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
                         : const Icon(Icons.login),
                     label: Text(_loading ? 'MEMPROSES...' : 'MASUK'),
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: _loading ? null : _google,
+                    icon: const Icon(Icons.account_circle),
+                    label: const Text('MASUK DENGAN GOOGLE'),
                   ),
                 ],
               ),

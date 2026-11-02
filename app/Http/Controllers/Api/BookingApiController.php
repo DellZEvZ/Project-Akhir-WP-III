@@ -206,6 +206,113 @@ class BookingApiController extends Controller
         return response()->json(['success' => true, 'data' => $this->format($order)]);
     }
 
+    /**
+     * Ubah jadwal booking layanan milik customer yang login (tanggal, jam,
+     * barber, catatan). Hanya booking berstatus "confirmed" yang belum lunas.
+     */
+    public function update(Request $request, $id)
+    {
+        $order = Order::where('customer_id', $request->user()->id)->find($id);
+        if (!$order) {
+            return response()->json(['success' => false, 'message' => 'Booking tidak ditemukan'], 404);
+        }
+        if ($order->jenis !== 'booking') {
+            return response()->json(['success' => false, 'message' => 'Hanya booking layanan yang bisa diubah'], 422);
+        }
+        if ($order->status !== 'confirmed') {
+            return response()->json(['success' => false, 'message' => "Booking berstatus {$order->status_label} tidak bisa diubah"], 422);
+        }
+        if ($order->status_bayar === 'lunas') {
+            return response()->json(['success' => false, 'message' => 'Booking yang sudah dibayar tidak bisa diubah. Hubungi admin.'], 422);
+        }
+
+        $request->validate([
+            'barber_id'       => 'sometimes|integer|exists:barbers,id',
+            'tanggal_booking' => 'sometimes|date|after_or_equal:today',
+            'jam_booking'     => 'sometimes',
+            'catatan'         => 'nullable|string|max:500',
+        ]);
+
+        $barberId = $request->input('barber_id', $order->barber_id);
+        $tanggal  = $request->input('tanggal_booking', $order->tanggal_booking?->toDateString());
+        $jam      = $request->input('jam_booking', $order->jam_booking);
+
+        // Bentrok jadwal, mengabaikan booking ini sendiri.
+        $bentrok = Order::where('jenis', 'booking')
+            ->whereIn('status', ['confirmed', 'done'])
+            ->where('id', '!=', $order->id)
+            ->where('barber_id', $barberId)
+            ->where('tanggal_booking', $tanggal)
+            ->where('jam_booking', $jam)
+            ->exists();
+
+        if ($bentrok) {
+            $barberNama = Barber::find($barberId)->nama ?? 'Barber ini';
+            return response()->json([
+                'success' => false,
+                'message' => "{$barberNama} sudah dibooking pada jam {$jam} tanggal {$tanggal}. Silakan pilih jam lain atau barber lain.",
+            ], 422);
+        }
+
+        $sebelum = [
+            'barber_id'       => $order->barber_id,
+            'tanggal_booking' => $order->tanggal_booking?->toDateString(),
+            'jam_booking'     => $order->jam_booking,
+            'catatan'         => $order->catatan,
+        ];
+
+        $order->update([
+            'barber_id'       => $barberId,
+            'tanggal_booking' => $tanggal,
+            'jam_booking'     => $jam,
+            'catatan'         => $request->has('catatan') ? $request->catatan : $order->catatan,
+        ]);
+
+        $this->logCustomerActivity('update', 'Mobile Booking Updated', $order, [
+            'sebelum' => $sebelum,
+            'sesudah' => [
+                'barber_id'       => $order->barber_id,
+                'tanggal_booking' => $order->tanggal_booking?->toDateString(),
+                'jam_booking'     => $order->jam_booking,
+                'catatan'         => $order->catatan,
+            ],
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'data'    => $this->format($order->load('orderItems.layanan', 'orderItems.produk', 'barber')),
+            'message' => 'Booking berhasil diubah',
+        ]);
+    }
+
+    /**
+     * Batalkan booking milik customer yang login. Data tidak dihapus: status
+     * menjadi "batal" supaya tetap terlihat di panel admin.
+     */
+    public function destroy(Request $request, $id)
+    {
+        $order = Order::where('customer_id', $request->user()->id)->find($id);
+        if (!$order) {
+            return response()->json(['success' => false, 'message' => 'Booking tidak ditemukan'], 404);
+        }
+        if (!in_array($order->status, ['pending', 'confirmed'], true)) {
+            return response()->json(['success' => false, 'message' => "Pesanan berstatus {$order->status_label} tidak bisa dibatalkan"], 422);
+        }
+        if ($order->status_bayar === 'lunas') {
+            return response()->json(['success' => false, 'message' => 'Pesanan yang sudah dibayar tidak bisa dibatalkan. Hubungi admin.'], 422);
+        }
+
+        $order->update(['status' => 'batal']);
+
+        $this->logCustomerActivity('delete', 'Mobile Booking Cancelled', $order, ['jenis' => $order->jenis]);
+
+        return response()->json([
+            'success' => true,
+            'data'    => $this->format($order->load('orderItems.layanan', 'orderItems.produk', 'barber')),
+            'message' => 'Pesanan dibatalkan',
+        ]);
+    }
+
     public function pay(Request $request, $id)
     {
         $request->validate([

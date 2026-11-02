@@ -1,3 +1,4 @@
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'api_service.dart';
 import '../config/app_config.dart';
@@ -78,6 +79,36 @@ class AuthService {
       return e.message;
     } catch (_) {
       return 'Tidak dapat terhubung ke server.';
+    }
+  }
+
+  static bool _googleReady = false;
+
+  /// Login dengan akun Google (Google Sign-In native, bukan browser/WebView).
+  /// ID token dikirim ke backend, yang memverifikasinya lalu mengeluarkan
+  /// token Sanctum. Mengembalikan null bila sukses, atau pesan error.
+  static Future<String?> loginWithGoogle() async {
+    if (_offlineMode) return 'Login Google membutuhkan koneksi ke server.';
+    try {
+      final signIn = GoogleSignIn.instance;
+      if (!_googleReady) {
+        await signIn.initialize(serverClientId: AppConfig.googleServerClientId);
+        _googleReady = true;
+      }
+      final account = await signIn.authenticate();
+      final idToken = account.authentication.idToken;
+      if (idToken == null) return 'Google tidak mengembalikan token.';
+
+      final res = await ApiService.post('/login/google', {'id_token': idToken});
+      await ApiService.saveToken(res['data']['token']);
+      return null;
+    } on GoogleSignInException catch (e) {
+      if (e.code == GoogleSignInExceptionCode.canceled) return 'Login Google dibatalkan.';
+      return 'Login Google gagal (${e.code.name}).';
+    } on ApiException catch (e) {
+      return e.message;
+    } catch (_) {
+      return 'Login Google gagal.';
     }
   }
 
