@@ -62,7 +62,17 @@
                             <td class="text-center"><i class="mdi {{ $ic[0] }}" style="font-size:22px;color:{{ $ic[1] }}"></i></td>
                             <td>{{ $log->description }}</td>
                             <td><span class="badge badge-light text-uppercase">{{ $log->module }}</span></td>
-                            <td>{{ $log->user->name ?? '—' }}</td>
+                            <td>
+                                @if ($log->user)
+                                    {{ $log->user->name }}
+                                @elseif (!empty($log->properties['customer_nama']))
+                                    {{ $log->properties['customer_nama'] }} <span class="badge badge-light">Customer</span>
+                                @elseif (!empty($log->properties['customer_id']))
+                                    <span class="text-muted">Customer #{{ $log->properties['customer_id'] }}</span>
+                                @else
+                                    —
+                                @endif
+                            </td>
                             <td><small class="text-muted">{{ $log->ip_address }}</small></td>
                             <td><small>{{ $log->created_at->diffForHumans() }}</small><br><small class="text-muted">{{ $log->created_at->format('d/m/Y H:i') }}</small></td>
                         </tr>

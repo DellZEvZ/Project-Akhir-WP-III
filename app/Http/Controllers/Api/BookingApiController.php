@@ -31,10 +31,28 @@ class BookingApiController extends Controller
             'subject_type' => $order ? Order::class : null,
             'subject_id'   => $order?->id,
             'description'  => $description,
-            'properties'   => array_merge(['customer_id' => $order?->customer_id], $extra),
-            'ip_address'   => request()->ip(),
+            // Snapshot identitas customer: user_id dipakai admin, jadi nama customer
+            // disimpan di properties agar kolom "Oleh" di panel admin bisa menampilkannya.
+            'properties'   => array_merge([
+                'customer_id'    => $order?->customer_id,
+                'customer_nama'  => request()->user()?->nama,
+                'customer_email' => request()->user()?->email,
+            ], $extra),
+            'ip_address'   => $this->clientIp(),
             'user_agent'   => request()->userAgent(),
         ]);
+    }
+
+    /**
+     * IP asli pengguna. Di balik Cloudflare, request()->ip() berisi IP edge
+     * Cloudflare; IP klien ada di CF-Connecting-IP. Hanya dipakai untuk log
+     * (bukan keputusan keamanan), jadi header dipakai bila berisi IP valid.
+     */
+    private function clientIp(): ?string
+    {
+        $cf = request()->header('CF-Connecting-IP');
+
+        return ($cf && filter_var($cf, FILTER_VALIDATE_IP)) ? $cf : request()->ip();
     }
 
     public function index(Request $request)

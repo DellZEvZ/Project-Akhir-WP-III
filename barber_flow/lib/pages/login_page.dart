@@ -32,8 +32,9 @@ class _LoginPageState extends State<LoginPage> {
     if (!mounted) return;
     setState(() => _loading = false);
 
-    // Sukses (error == null) atau server tidak terjangkau -> lanjut (mode demo).
-    if (error == null || error.contains('terhubung')) {
+    // Hanya lanjut bila login benar-benar berhasil (token tersimpan).
+    // Server tidak terjangkau -> tetap di halaman login dengan pesan error.
+    if (error == null) {
       // Jadikan MainPage sebagai root agar tidak "terlempar" ke Welcome
       // setelah aksi seperti booking (popUntil isFirst).
       Navigator.pushAndRemoveUntil(

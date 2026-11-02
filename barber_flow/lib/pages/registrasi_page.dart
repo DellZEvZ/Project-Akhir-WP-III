@@ -38,7 +38,7 @@ class _RegistrasiPageState extends State<RegistrasiPage> {
     if (!mounted) return;
     setState(() => _loading = false);
 
-    if (error == null || error.contains('terhubung')) {
+    if (error == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           backgroundColor: AppColors.dark,
