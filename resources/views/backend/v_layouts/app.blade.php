@@ -1007,7 +1007,7 @@
                 $('#usersGridDashboard').hide();
 
                 $.ajax({
-                    url: '{{ route("api.quick-login.users") }}',
+                    url: '{{ url("api/quick-login/users") }}',
                     method: 'GET',
                     success: function(response) {
                         if (response.success) {

@@ -622,7 +622,7 @@
                         </div>
 
                         <!-- Quick Login for Testing (Only in DEBUG mode) -->
-                        @if(config('app.debug'))
+                        @if(app()->isLocal() && config('app.debug'))
                         <div style="text-align: center; margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;">
                             <button type="button" class="btn btn-link" style="color: #667eea; font-size: 13px;" id="btn-quick-login">
                                 <i class="fas fa-bolt"></i> Login Cepat - Testing
@@ -868,7 +868,7 @@
             $('#usersGrid').hide();
 
             $.ajax({
-                url: '{{ route("api.quick-login.users") }}',
+                url: '{{ url("api/quick-login/users") }}',
                 method: 'GET',
                 success: function(response) {
                     if (response.success) {
