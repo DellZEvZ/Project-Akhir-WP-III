@@ -67,6 +67,8 @@ services:
       # Persist file yang diunggah (gambar). Pada pembuatan pertama, volume ini
       # otomatis diisi dari isi folder storage di image (termasuk gambar seed).
       - storage_data:/var/www/html/storage
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
 
 volumes:
   storage_data:
