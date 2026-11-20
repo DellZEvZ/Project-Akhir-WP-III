@@ -560,6 +560,24 @@
                             </a>
                         </li>
 
+                        {{-- ULASAN --}}
+                        <li class="sidebar-item">
+                            <a class="sidebar-link waves-effect waves-dark" href="{{ route('backend.ulasan.index') }}" aria-expanded="false">
+                                <i class="mdi mdi-star-circle"></i>
+                                <span class="hide-menu">Ulasan</span>
+                            </a>
+                        </li>
+
+                        {{-- API TESTER (Super Admin) --}}
+                        @if(auth()->user()->hasRole('super-admin'))
+                        <li class="sidebar-item">
+                            <a class="sidebar-link waves-effect waves-dark" href="{{ route('backend.apitester.index') }}" aria-expanded="false">
+                                <i class="mdi mdi-api"></i>
+                                <span class="hide-menu">API Tester</span>
+                            </a>
+                        </li>
+                        @endif
+
                         {{-- INVENTARIS --}}
                         <li class="sidebar-item">
                             <a class="sidebar-link has-arrow waves-effect waves-dark" href="javascript:void(0)" aria-expanded="false">

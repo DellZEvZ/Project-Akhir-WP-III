@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../theme.dart';
 import '../services/api_service.dart';
 import '../services/booking_service.dart';
+import '../services/ulasan_service.dart';
+import '../models/ulasan.dart';
 import 'struk_page.dart';
 import 'payment_page.dart';
 
@@ -15,16 +17,102 @@ class RiwayatPage extends StatefulWidget {
 
 class _RiwayatPageState extends State<RiwayatPage> {
   late Future<List<Map<String, dynamic>>> _future;
+  // Ulasan milik customer, diindeks per order_id.
+  Map<int, Ulasan> _ulasan = {};
 
   @override
   void initState() {
     super.initState();
-    _future = BookingService.fetchOrders();
+    _future = _load();
+  }
+
+  Future<List<Map<String, dynamic>>> _load() async {
+    final orders = await BookingService.fetchOrders();
+    try {
+      final list = await UlasanService.fetchAll();
+      _ulasan = {for (final u in list) u.orderId: u};
+    } catch (_) {
+      _ulasan = {}; // gagal memuat ulasan tidak boleh menggagalkan riwayat
+    }
+    return orders;
   }
 
   Future<void> _refresh() async {
-    setState(() => _future = BookingService.fetchOrders());
+    setState(() => _future = _load());
     await _future;
+  }
+
+  /// Dialog beri/ubah ulasan. [lama] != null berarti mode ubah.
+  Future<void> _tulisUlasan(Map<String, dynamic> o, {Ulasan? lama}) async {
+    int rating = lama?.rating ?? 5;
+    final komentarCtrl = TextEditingController(text: lama?.komentar ?? '');
+
+    final simpan = await showDialog<bool>(
+      context: context,
+      builder: (_) => StatefulBuilder(
+        builder: (context, setLocal) => AlertDialog(
+          title: Text(lama == null ? 'Beri Ulasan' : 'Ubah Ulasan'),
+          content: Column(mainAxisSize: MainAxisSize.min, children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(5, (i) {
+                return IconButton(
+                  icon: Icon(i < rating ? Icons.star : Icons.star_border, color: Colors.amber, size: 32),
+                  onPressed: () => setLocal(() => rating = i + 1),
+                );
+              }),
+            ),
+            TextField(
+              controller: komentarCtrl,
+              decoration: const InputDecoration(labelText: 'Komentar (opsional)'),
+              maxLength: 500,
+              maxLines: 3,
+            ),
+          ]),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('BATAL')),
+            TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('SIMPAN')),
+          ],
+        ),
+      ),
+    );
+    if (simpan != true) return;
+    try {
+      final komentar = komentarCtrl.text.trim();
+      if (lama == null) {
+        await UlasanService.create(orderId: o['id'] as int, rating: rating, komentar: komentar);
+      } else {
+        await UlasanService.update(lama.id, rating: rating, komentar: komentar);
+      }
+      if (!mounted) return;
+      _snack(lama == null ? 'Ulasan dikirim.' : 'Ulasan diperbarui.');
+      _refresh();
+    } on ApiException catch (e) {
+      if (mounted) _snack(e.message, error: true);
+    }
+  }
+
+  Future<void> _hapusUlasan(Ulasan u) async {
+    final yakin = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Hapus ulasan?'),
+        content: const Text('Ulasan ini akan dihapus permanen.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('TIDAK')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('YA, HAPUS')),
+        ],
+      ),
+    );
+    if (yakin != true) return;
+    try {
+      await UlasanService.delete(u.id);
+      if (!mounted) return;
+      _snack('Ulasan dihapus.');
+      _refresh();
+    } on ApiException catch (e) {
+      if (mounted) _snack(e.message, error: true);
+    }
   }
 
   String _rp(dynamic n) {
@@ -213,8 +301,35 @@ class _RiwayatPageState extends State<RiwayatPage> {
                                 '• Ongkos Kirim (${o['kurir'] ?? ''} ${o['layanan_ongkir'] ?? ''})  ${_rp(o['biaya_ongkir'])}',
                                 style: const TextStyle(fontSize: 13)),
                           ),
+                        if (o['status'] == 'done' && !isProduk && _ulasan[o['id']] != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 6),
+                            child: Text(
+                              'Ulasanmu: ${'★' * _ulasan[o['id']]!.rating}${'☆' * (5 - _ulasan[o['id']]!.rating)}'
+                              '${_ulasan[o['id']]!.komentar.isNotEmpty ? '\n"${_ulasan[o['id']]!.komentar}"' : ''}',
+                              style: const TextStyle(fontSize: 12, color: Colors.amber),
+                            ),
+                          ),
                         const SizedBox(height: 8),
                         Wrap(spacing: 8, runSpacing: 4, children: [
+                          if (o['status'] == 'done' && !isProduk && _ulasan[o['id']] == null)
+                            OutlinedButton.icon(
+                              onPressed: () => _tulisUlasan(o),
+                              icon: const Icon(Icons.star_border, size: 18),
+                              label: const Text('Beri Ulasan'),
+                            ),
+                          if (o['status'] == 'done' && !isProduk && _ulasan[o['id']] != null) ...[
+                            OutlinedButton.icon(
+                              onPressed: () => _tulisUlasan(o, lama: _ulasan[o['id']]),
+                              icon: const Icon(Icons.edit, size: 18),
+                              label: const Text('Ubah Ulasan'),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: () => _hapusUlasan(_ulasan[o['id']]!),
+                              icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                              label: const Text('Hapus', style: TextStyle(color: Colors.red)),
+                            ),
+                          ],
                           if (o['status'] == 'confirmed' && !lunas && !isProduk)
                             OutlinedButton.icon(
                               onPressed: () => _ubah(o),

@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\CatalogApiController;
 use App\Http\Controllers\Api\CustomerApiController;
 use App\Http\Controllers\Api\BookingApiController;
+use App\Http\Controllers\Api\UlasanApiController;
 
 // ===== Publik (tanpa token) =====
 Route::get('/layanan',      [CatalogApiController::class, 'layanan']);
@@ -31,6 +32,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/booking/{id}',     [BookingApiController::class, 'update']);
     Route::delete('/booking/{id}',  [BookingApiController::class, 'destroy']);
     Route::post('/booking/{id}/pay', [BookingApiController::class, 'pay']);
+
+    // Ulasan layanan (booking berstatus done)
+    Route::get('/ulasan',           [UlasanApiController::class, 'index']);
+    Route::post('/ulasan',          [UlasanApiController::class, 'store']);
+    Route::get('/ulasan/{id}',      [UlasanApiController::class, 'show']);
+    Route::put('/ulasan/{id}',      [UlasanApiController::class, 'update']);
+    Route::delete('/ulasan/{id}',   [UlasanApiController::class, 'destroy']);
 
     Route::get('/shipping/search',  [BookingApiController::class, 'searchShipping']);
     Route::post('/shipping/cost',   [BookingApiController::class, 'shippingCost']);

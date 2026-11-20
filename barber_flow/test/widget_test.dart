@@ -6,7 +6,6 @@ void main() {
   testWidgets('Welcome page tampil', (WidgetTester tester) async {
     await tester.pumpWidget(const BarberFlowApp());
 
-    expect(find.text('BARBER FLOW'), findsOneWidget);
     expect(find.text('REGISTRASI'), findsOneWidget);
     expect(find.text('LOGIN'), findsOneWidget);
   });

@@ -237,6 +237,13 @@ Route::middleware(['auth'])->group(function () {
     // Traffic & Aktivitas (supervisor/pemilik)
     Route::get('backend/aktivitas', [\App\Http\Controllers\ActivityController::class, 'index'])->name('backend.aktivitas.index');
 
+    // Moderasi ulasan dari app mobile
+    Route::get('backend/ulasan', [\App\Http\Controllers\UlasanController::class, 'index'])->name('backend.ulasan.index');
+    Route::delete('backend/ulasan/{ulasan}', [\App\Http\Controllers\UlasanController::class, 'destroy'])->name('backend.ulasan.destroy');
+
+    // API Tester (Super Admin saja; dicek di controller)
+    Route::get('backend/api-tester', [\App\Http\Controllers\ApiTesterController::class, 'index'])->name('backend.apitester.index');
+
     // Manajemen Booking (admin)
     Route::get('backend/order', [OrderController::class, 'index'])->name('backend.order.index');
     Route::get('backend/order/{order}', [OrderController::class, 'show'])->name('backend.order.show');
