@@ -24,12 +24,24 @@ return [
             'body' => ['email' => 'uji@example.com', 'password' => 'rahasia123']],
         ['method' => 'POST', 'path' => '/login/google', 'desc' => 'Login Google (butuh ID token asli dari app)', 'auth' => false,
             'body' => ['id_token' => '<id token Google>']],
+        ['method' => 'POST', 'path' => '/password/forgot', 'desc' => 'Lupa password: ajukan permintaan ke admin (berisi request_token; 422 bila email tidak terdaftar)', 'auth' => false,
+            'body' => ['email' => 'uji@example.com']],
+        ['method' => 'POST', 'path' => '/password/status', 'desc' => 'Cek status permintaan; setelah disetujui admin, password sementara diserahkan SEKALI', 'auth' => false,
+            'body' => ['request_token' => '<dari /password/forgot>']],
         ['method' => 'POST', 'path' => '/logout', 'desc' => 'Keluar; mencabut token', 'auth' => true],
     ],
     'Profil' => [
         ['method' => 'GET', 'path' => '/me', 'desc' => 'Data customer yang login', 'auth' => true],
         ['method' => 'POST', 'path' => '/me', 'desc' => 'Ubah profil', 'auth' => true,
             'body' => ['nama' => 'Customer Uji', 'no_hp' => '081234567890', 'alamat' => 'Jl. Contoh No. 1']],
+    ],
+    'Ganti Password' => [
+        ['method' => 'POST', 'path' => '/me/password', 'desc' => 'Ganti password (juga untuk mengganti password sementara)', 'auth' => true,
+            'body' => ['current_password' => 'rahasia123', 'password' => 'passwordBaru123']],
+    ],
+    'Hapus Akun' => [
+        ['method' => 'DELETE', 'path' => '/me', 'desc' => 'Hapus akun (anonimisasi; akun berpassword wajib kirim password)', 'auth' => true,
+            'body' => ['password' => 'rahasia123']],
     ],
     'Booking' => [
         ['method' => 'GET', 'path' => '/booking', 'desc' => 'Riwayat booking customer', 'auth' => true],

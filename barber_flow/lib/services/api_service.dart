@@ -58,10 +58,12 @@ class ApiService {
     });
   }
 
-  static Future<dynamic> delete(String path, {bool auth = false}) async {
+  static Future<dynamic> delete(String path, {bool auth = false, Map? body}) async {
     return _safeCall(() async {
       final res = await http
-          .delete(_uri(path), headers: await _headers(auth: auth))
+          .delete(_uri(path),
+              headers: await _headers(auth: auth),
+              body: body == null ? null : jsonEncode(body))
           .timeout(const Duration(seconds: AppConfig.timeoutSeconds));
       return _decode(res);
     });

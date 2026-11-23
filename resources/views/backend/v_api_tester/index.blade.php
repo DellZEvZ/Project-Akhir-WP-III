@@ -156,7 +156,7 @@
         $('queryBox').style.display = ep.query !== undefined ? '' : 'none';
         $('reqQuery').value = ep.query || '';
 
-        var hasBody = ep.method === 'POST' || ep.method === 'PUT';
+        var hasBody = ep.method === 'POST' || ep.method === 'PUT' || (ep.method === 'DELETE' && !!ep.body);
         $('bodyBox').style.display = hasBody ? '' : 'none';
         $('reqBody').value = ep.body ? JSON.stringify(ep.body, null, 2) : (hasBody ? '{}' : '');
         $('btnSend').disabled = false;
@@ -189,7 +189,7 @@
 
         var opt = { method: current.method, headers: headers, credentials: 'omit' };
         var bodyText = '';
-        if (current.method === 'POST' || current.method === 'PUT') {
+        if ($('bodyBox').style.display !== 'none') {
             bodyText = $('reqBody').value.trim();
             if (bodyText) {
                 try { JSON.parse(bodyText); } catch (e) { alert('Body bukan JSON yang valid: ' + e.message); return; }

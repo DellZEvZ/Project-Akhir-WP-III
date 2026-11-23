@@ -97,12 +97,17 @@ class UlasanApiController extends Controller
             return response()->json(['success' => false, 'message' => 'Booking ini sudah diulas'], 422);
         }
 
-        $u = Ulasan::create([
-            'customer_id' => $request->user()->id,
-            'order_id'    => $order->id,
-            'rating'      => $request->rating,
-            'komentar'    => $request->komentar,
-        ]);
+        try {
+            $u = Ulasan::create([
+                'customer_id' => $request->user()->id,
+                'order_id'    => $order->id,
+                'rating'      => $request->rating,
+                'komentar'    => $request->komentar,
+            ]);
+        } catch (\Illuminate\Database\UniqueConstraintViolationException $e) {
+            // Dua permintaan bersamaan lolos cek exists(); kunci unik order_id menahan yang kedua.
+            return response()->json(['success' => false, 'message' => 'Booking ini sudah diulas'], 422);
+        }
 
         $this->log('create', 'Mobile Review Created', $u);
 

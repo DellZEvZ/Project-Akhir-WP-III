@@ -21,7 +21,9 @@ class _GaleriPageState extends State<GaleriPage> {
   }
 
   Future<void> _refresh() async {
-    setState(() => _future = CatalogService.fetchGaleri());
+    setState(() {
+      _future = CatalogService.fetchGaleri();
+    });
     await _future;
   }
 

@@ -568,6 +568,16 @@
                             </a>
                         </li>
 
+                        {{-- RESET PASSWORD CUSTOMER (Super Admin/Admin) --}}
+                        @if(auth()->user()->hasRole('super-admin') || auth()->user()->hasRole('admin'))
+                        <li class="sidebar-item">
+                            <a class="sidebar-link waves-effect waves-dark" href="{{ route('backend.resetpassword.index') }}" aria-expanded="false">
+                                <i class="mdi mdi-lock-reset"></i>
+                                <span class="hide-menu">Reset Password</span>
+                            </a>
+                        </li>
+                        @endif
+
                         {{-- API TESTER (Super Admin) --}}
                         @if(auth()->user()->hasRole('super-admin'))
                         <li class="sidebar-item">

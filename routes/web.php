@@ -236,10 +236,18 @@ Route::middleware(['auth'])->group(function () {
 
     // Traffic & Aktivitas (supervisor/pemilik)
     Route::get('backend/aktivitas', [\App\Http\Controllers\ActivityController::class, 'index'])->name('backend.aktivitas.index');
+    Route::get('backend/aktivitas/feed', [\App\Http\Controllers\ActivityController::class, 'feed'])->name('backend.aktivitas.feed');
 
     // Moderasi ulasan dari app mobile
     Route::get('backend/ulasan', [\App\Http\Controllers\UlasanController::class, 'index'])->name('backend.ulasan.index');
     Route::delete('backend/ulasan/{ulasan}', [\App\Http\Controllers\UlasanController::class, 'destroy'])->name('backend.ulasan.destroy');
+
+    // Persetujuan reset password customer (Super Admin/Admin; dicek di controller)
+    Route::get('backend/reset-password', [\App\Http\Controllers\PasswordResetController::class, 'index'])->name('backend.resetpassword.index');
+    Route::get('backend/reset-password/count', [\App\Http\Controllers\PasswordResetController::class, 'count'])->name('backend.resetpassword.count');
+    Route::get('backend/reset-password/{permintaan}', [\App\Http\Controllers\PasswordResetController::class, 'show'])->whereNumber('permintaan')->name('backend.resetpassword.show');
+    Route::post('backend/reset-password/{permintaan}/setujui', [\App\Http\Controllers\PasswordResetController::class, 'approve'])->name('backend.resetpassword.approve');
+    Route::post('backend/reset-password/{permintaan}/tolak', [\App\Http\Controllers\PasswordResetController::class, 'reject'])->name('backend.resetpassword.reject');
 
     // API Tester (Super Admin saja; dicek di controller)
     Route::get('backend/api-tester', [\App\Http\Controllers\ApiTesterController::class, 'index'])->name('backend.apitester.index');

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import 'main_page.dart';
+import 'lupa_password_page.dart';
+import 'ubah_password_page.dart';
 
 /// Halaman Login (StatefulWidget) — simulasi tanpa autentikasi server.
 class LoginPage extends StatefulWidget {
@@ -36,10 +38,13 @@ class _LoginPageState extends State<LoginPage> {
     // Server tidak terjangkau -> tetap di halaman login dengan pesan error.
     if (error == null) {
       // Jadikan MainPage sebagai root agar tidak "terlempar" ke Welcome
-      // setelah aksi seperti booking (popUntil isFirst).
+      // setelah aksi seperti booking (popUntil isFirst). Bila masih memakai password
+      // sementara dari admin, wajib membuat password baru dulu.
       Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(builder: (_) => const MainPage()),
+        MaterialPageRoute(
+          builder: (_) => AuthService.mustChangePassword ? const UbahPasswordPage(wajib: true) : const MainPage(),
+        ),
         (route) => false,
       );
     } else {
@@ -58,13 +63,25 @@ class _LoginPageState extends State<LoginPage> {
     if (error == null) {
       Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(builder: (_) => const MainPage()),
+        MaterialPageRoute(
+          builder: (_) => AuthService.mustChangePassword ? const UbahPasswordPage(wajib: true) : const MainPage(),
+        ),
         (route) => false,
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(error), backgroundColor: Colors.red),
       );
+    }
+  }
+
+  Future<void> _lupaPassword() async {
+    final email = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(builder: (_) => LupaPasswordPage(initialEmail: _emailCtrl.text.trim())),
+    );
+    if (email != null && email.isNotEmpty && mounted) {
+      setState(() => _emailCtrl.text = email); // lanjut login dengan password sementara
     }
   }
 
@@ -117,6 +134,13 @@ class _LoginPageState extends State<LoginPage> {
                       if (v.length < 6) return 'Password minimal 6 karakter';
                       return null;
                     },
+                  ),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: _loading ? null : _lupaPassword,
+                      child: const Text('Lupa password?'),
+                    ),
                   ),
                   const SizedBox(height: 24),
                   ElevatedButton.icon(

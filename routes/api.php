@@ -15,15 +15,24 @@ Route::get('/barber',       [CatalogApiController::class, 'barber']);
 Route::get('/galeri',       [CatalogApiController::class, 'galeri']);
 
 // Auth customer
-Route::post('/register', [CustomerApiController::class, 'register']);
-Route::post('/login',    [CustomerApiController::class, 'login']);
-Route::post('/login/google', [CustomerApiController::class, 'google']);
+Route::middleware('throttle:auth-api')->group(function () {
+    Route::post('/register', [CustomerApiController::class, 'register']);
+    Route::post('/login',    [CustomerApiController::class, 'login']);
+    Route::post('/login/google', [CustomerApiController::class, 'google']);
+    // Lupa password: ajukan permintaan -> admin menyetujui di panel -> password sementara
+    Route::post('/password/forgot', [CustomerApiController::class, 'forgotPassword']);
+});
+// App menanyakan status permintaannya tiap beberapa detik, jadi batasnya lebih longgar.
+Route::post('/password/status', [CustomerApiController::class, 'passwordStatus'])->middleware('throttle:reset-status');
 
 // ===== Terproteksi (Bearer token) =====
-Route::middleware('auth:sanctum')->group(function () {
+// EnsurePasswordChanged: selama masih memakai password sementara, hanya /me, /me/password, /logout yang boleh.
+Route::middleware(['auth:sanctum', \App\Http\Middleware\EnsurePasswordChanged::class])->group(function () {
     Route::post('/logout', [CustomerApiController::class, 'logout']);
     Route::get('/me',      [CustomerApiController::class, 'me']);
     Route::post('/me',     [CustomerApiController::class, 'update']);
+    Route::delete('/me',   [CustomerApiController::class, 'destroy']);
+    Route::post('/me/password', [CustomerApiController::class, 'changePassword'])->middleware('throttle:auth-api');
 
     Route::get('/booking',          [BookingApiController::class, 'index']);
     Route::post('/booking',         [BookingApiController::class, 'store']);

@@ -11,6 +11,36 @@ use Illuminate\Validation\ValidationException;
 
 class CustomerApiController extends Controller
 {
+    /**
+     * Catat aktivitas customer (register/login/profil/hapus akun) ke activity_logs.
+     * user_id selalu null (customer bukan staf; FK ke tabel user); identitas ada
+     * di properties. Kegagalan log TIDAK boleh menggagalkan request utamanya.
+     */
+    private function log(string $actionType, string $description, ?Customer $c, array $extra = []): void
+    {
+        try {
+            $cf = request()->header('CF-Connecting-IP');
+
+            \App\Models\ActivityLog::create([
+                'user_id'      => null,
+                'action_type'  => $actionType,
+                'module'       => 'pelanggan',
+                'subject_type' => $c ? Customer::class : null,
+                'subject_id'   => $c?->id,
+                'description'  => $description,
+                'properties'   => array_merge([
+                    'customer_id'    => $c?->id,
+                    'customer_nama'  => $c?->nama,
+                    'customer_email' => $c?->email,
+                ], $extra),
+                'ip_address'   => ($cf && filter_var($cf, FILTER_VALIDATE_IP)) ? $cf : request()->ip(),
+                'user_agent'   => request()->userAgent(),
+            ]);
+        } catch (\Throwable $e) {
+            report($e);
+        }
+    }
+
     private function payload(Customer $customer, string $token): array
     {
         return [
@@ -20,6 +50,7 @@ class CustomerApiController extends Controller
                 'nama'  => $customer->nama,
                 'email' => $customer->email,
                 'no_hp' => $customer->no_hp,
+                'must_change_password' => (bool) $customer->must_change_password,
             ],
         ];
     }
@@ -39,6 +70,7 @@ class CustomerApiController extends Controller
         ]);
 
         $token = $customer->createToken('mobile')->plainTextToken;
+        $this->log('create', 'Mobile Register', $customer);
 
         return response()->json([
             'success' => true,
@@ -57,12 +89,21 @@ class CustomerApiController extends Controller
         $customer = Customer::where('email', $request->email)->first();
 
         if (!$customer || !$customer->password || !Hash::check($request->password, $customer->password)) {
+            // Email yang diketik dicatat (bukan password) untuk mendeteksi percobaan berulang.
+            $this->log('login', 'Mobile Login Failed', $customer, ['customer_email' => $request->email]);
             throw ValidationException::withMessages([
                 'email' => ['Email atau password salah.'],
             ]);
         }
 
+        if ($customer->must_change_password && $customer->password_temp_expires_at?->isPast()) {
+            throw ValidationException::withMessages([
+                'email' => ['Password sementara sudah kedaluwarsa. Ajukan reset password lagi.'],
+            ]);
+        }
+
         $token = $customer->createToken('mobile')->plainTextToken;
+        $this->log('login', 'Mobile Login', $customer);
 
         return response()->json([
             'success' => true,
@@ -125,6 +166,7 @@ class CustomerApiController extends Controller
         }
 
         $token = $customer->createToken('mobile')->plainTextToken;
+        $this->log('login', 'Mobile Login Google', $customer);
 
         return response()->json([
             'success' => true,
@@ -133,10 +175,184 @@ class CustomerApiController extends Controller
         ]);
     }
 
+    private const RESET_MASA_BERLAKU_JAM = 24;
+    private const RESET_MAX_PENDING = 3;
+
+    /**
+     * Lupa password, langkah 1: pengguna hanya mengisi email. Server membuat PERMINTAAN
+     * yang harus disetujui admin di panel, dan membalas `request_token` yang hanya dipegang
+     * app pemohon; token itu satu-satunya cara mengambil password sementara setelah disetujui.
+     * Email yang tidak terdaftar langsung ditolak dengan pesan jelas (keberadaan email memang
+     * sudah bisa diketahui lewat registrasi, jadi menyembunyikannya di sini tidak melindungi apa pun).
+     */
+    public function forgotPassword(Request $request)
+    {
+        $request->validate(['email' => 'required|email']);
+
+        $customer = Customer::where('email', $request->email)->first();
+
+        if (!$customer || str_ends_with($customer->email, '@deleted.invalid')) {
+            $this->log('update', 'Mobile Password Reset Requested (email tidak terdaftar)', null, [
+                'customer_email' => $request->email, 'terdaftar' => false,
+            ]);
+            throw ValidationException::withMessages(['email' => ['Email tidak terdaftar.']]);
+        }
+
+        if (\App\Models\PasswordResetRequest::where('customer_id', $customer->id)->aktif()->count() >= self::RESET_MAX_PENDING) {
+            throw ValidationException::withMessages([
+                'email' => ['Sudah ada permintaan yang menunggu persetujuan admin untuk akun ini. Mohon tunggu.'],
+            ]);
+        }
+
+        $token = \Illuminate\Support\Str::random(48);
+        $cf = $request->header('CF-Connecting-IP');
+        \App\Models\PasswordResetRequest::create([
+            'customer_id' => $customer->id,
+            'token_hash'  => hash('sha256', $token),
+            'expires_at'  => now()->addHours(self::RESET_MASA_BERLAKU_JAM),
+            'ip_address'  => ($cf && filter_var($cf, FILTER_VALIDATE_IP)) ? $cf : $request->ip(),
+            'user_agent'  => substr((string) $request->userAgent(), 0, 255),
+        ]);
+        $this->log('update', 'Mobile Password Reset Requested', $customer, ['terdaftar' => true]);
+
+        return response()->json([
+            'success' => true,
+            'data'    => ['request_token' => $token],
+            'message' => 'Permintaan dikirim. Menunggu persetujuan admin.',
+        ]);
+    }
+
+    /**
+     * Lupa password, langkah 2: app menanyakan status permintaannya memakai request_token.
+     * Saat admin sudah menyetujui, password sementara diserahkan SEKALI saja.
+     */
+    public function passwordStatus(Request $request)
+    {
+        $request->validate(['request_token' => 'required|string|max:100']);
+
+        $row = \App\Models\PasswordResetRequest::with('customer')
+            ->where('token_hash', hash('sha256', $request->request_token))->first();
+
+        // Token tak dikenal dijawab "pending" agar tidak bisa dipakai menebak apa pun.
+        if (!$row) {
+            return response()->json(['success' => true, 'data' => ['status' => 'pending'], 'message' => 'OK']);
+        }
+
+        if ($row->status === 'pending' && $row->expires_at->isPast()) {
+            $row->update(['status' => 'expired']);
+            $row->status = 'expired';
+        }
+
+        if ($row->status === 'approved') {
+            $temp = null;
+            try {
+                $temp = \Illuminate\Support\Facades\Crypt::decryptString($row->temp_password_enc);
+            } catch (\Throwable $e) {
+                report($e);
+            }
+            // Pembaruan bersyarat: hanya satu pemanggilan yang berhasil mengambil password.
+            $cf = $request->header('CF-Connecting-IP');
+            $diambil = \App\Models\PasswordResetRequest::where('id', $row->id)->where('status', 'approved')
+                ->update([
+                    'status'                => 'delivered',
+                    'temp_password_enc'     => null,
+                    'delivered_at'          => now(),
+                    'delivered_ip'          => ($cf && filter_var($cf, FILTER_VALIDATE_IP)) ? $cf : $request->ip(),
+                    'delivered_user_agent'  => substr((string) $request->userAgent(), 0, 255),
+                ]);
+
+            if ($diambil && $temp) {
+                $this->log('update', 'Mobile Password Reset Delivered', $row->customer);
+                return response()->json([
+                    'success' => true,
+                    'data'    => [
+                        'status'         => 'approved',
+                        'temp_password'  => $temp,
+                        'berlaku_hingga' => $row->customer->password_temp_expires_at?->toIso8601String(),
+                    ],
+                    'message' => 'Password direset oleh admin.',
+                ]);
+            }
+            $row->status = 'delivered';
+        }
+
+        return response()->json(['success' => true, 'data' => ['status' => $row->status], 'message' => 'OK']);
+    }
+
+    /** Ganti password dari profil (juga dipakai untuk mengganti password sementara). */
+    public function changePassword(Request $request)
+    {
+        $c = $request->user();
+
+        $request->validate([
+            'current_password' => $c->password ? 'required|string' : 'nullable',
+            'password'         => 'required|string|min:6',
+        ]);
+
+        if ($c->password && !Hash::check($request->current_password, $c->password)) {
+            throw ValidationException::withMessages(['current_password' => ['Password saat ini salah.']]);
+        }
+        if ($c->password && Hash::check($request->password, $c->password)) {
+            throw ValidationException::withMessages(['password' => ['Password baru tidak boleh sama dengan yang lama.']]);
+        }
+
+        $c->forceFill([
+            'password'                 => Hash::make($request->password),
+            'must_change_password'     => false,
+            'password_temp_expires_at' => null,
+        ])->save();
+
+        // Perangkat lain harus login ulang; sesi yang sedang dipakai tetap berjalan.
+        $c->tokens()->where('id', '!=', $request->user()->currentAccessToken()->id)->delete();
+        $this->log('update', 'Mobile Password Changed', $c);
+
+        return response()->json(['success' => true, 'data' => $this->profile($c->fresh()), 'message' => 'Password berhasil diubah']);
+    }
+
     public function logout(Request $request)
     {
+        $this->log('logout', 'Mobile Logout', $request->user());
         $request->user()->currentAccessToken()->delete();
         return response()->json(['success' => true, 'message' => 'Logout berhasil']);
+    }
+
+    /**
+     * Hapus akun = anonimisasi (bukan hapus baris): order lama masih
+     * mereferensikan customer, jadi riwayat di panel admin tetap utuh.
+     * Akun berpassword wajib konfirmasi password; akun Google tidak punya password.
+     */
+    public function destroy(Request $request)
+    {
+        $c = $request->user();
+
+        if ($c->password) {
+            $request->validate(['password' => 'required|string']);
+            if (!Hash::check($request->password, $c->password)) {
+                throw ValidationException::withMessages(['password' => ['Password salah.']]);
+            }
+        }
+
+        // Komentar ulasan bisa memuat data pribadi, jadi ikut dihapus (order tetap ada).
+        $ulasanDihapus = \App\Models\Ulasan::where('customer_id', $c->id)->delete();
+
+        // Catat sebelum data diubah; email sengaja tidak disimpan di log penghapusan.
+        $this->log('delete', 'Mobile Account Deleted', $c, [
+            'customer_email' => null,
+            'ulasan_dihapus' => $ulasanDihapus,
+        ]);
+
+        $c->tokens()->delete();
+        $c->forceFill([
+            'nama'      => 'Pengguna Terhapus',
+            'email'     => "terhapus-{$c->id}@deleted.invalid",
+            'password'  => null,
+            'no_hp'     => null,
+            'alamat'    => null,
+            'foto'      => null,
+            'google_id' => null,
+        ])->save();
+
+        return response()->json(['success' => true, 'data' => null, 'message' => 'Akun dihapus']);
     }
 
     public function me(Request $request)
@@ -153,7 +369,12 @@ class CustomerApiController extends Controller
         ]);
 
         $c = $request->user();
+        $sebelum = $c->only('nama', 'no_hp', 'alamat');
         $c->update($request->only('nama', 'no_hp', 'alamat'));
+        $this->log('update', 'Mobile Profile Updated', $c, [
+            'sebelum' => $sebelum,
+            'sesudah' => $c->only('nama', 'no_hp', 'alamat'),
+        ]);
 
         return response()->json([
             'success' => true,
@@ -170,6 +391,7 @@ class CustomerApiController extends Controller
             'email'  => $c->email,
             'no_hp'  => $c->no_hp,
             'alamat' => $c->alamat,
+            'must_change_password' => (bool) $c->must_change_password,
         ];
     }
 }

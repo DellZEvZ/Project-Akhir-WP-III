@@ -21,6 +21,11 @@ class Customer extends Model implements AuthenticatableContract
 
     protected $hidden = ['password'];
 
+    protected $casts = [
+        'must_change_password'     => 'boolean',
+        'password_temp_expires_at' => 'datetime',
+    ];
+
     public function orders()
     {
         return $this->hasMany(Order::class);

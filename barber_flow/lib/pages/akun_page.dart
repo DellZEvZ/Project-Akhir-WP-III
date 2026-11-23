@@ -3,6 +3,7 @@ import '../theme.dart';
 import '../services/auth_service.dart';
 import 'welcome_page.dart';
 import 'riwayat_page.dart';
+import 'ubah_password_page.dart';
 
 /// Manajemen akun: lihat & ubah profil, lalu logout.
 class AkunPage extends StatefulWidget {
@@ -77,6 +78,48 @@ class _AkunPageState extends State<AkunPage> {
     );
   }
 
+  Future<void> _hapusAkun() async {
+    final passCtrl = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Hapus akun?'),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Text('Data pribadimu akan dihapus permanen. Riwayat pesanan tetap tersimpan di sistem tanpa identitasmu.'),
+          const SizedBox(height: 12),
+          TextField(
+            controller: passCtrl,
+            obscureText: true,
+            decoration: const InputDecoration(
+              labelText: 'Password',
+              helperText: 'Kosongkan bila masuk dengan Google',
+            ),
+          ),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('BATAL')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('HAPUS AKUN', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+
+    final err = await AuthService.deleteAccount(password: passCtrl.text);
+    if (!mounted) return;
+    if (err != null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err), backgroundColor: Colors.red));
+      return;
+    }
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const WelcomePage()),
+      (route) => false,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -106,6 +149,17 @@ class _AkunPageState extends State<AkunPage> {
                     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RiwayatPage())),
                   ),
                 ),
+                const SizedBox(height: 8),
+                Card(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  child: ListTile(
+                    leading: const Icon(Icons.lock_outline, color: AppColors.primary),
+                    title: const Text('Ubah Password'),
+                    subtitle: const Text('Ganti password akun Anda'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const UbahPasswordPage())),
+                  ),
+                ),
                 const SizedBox(height: 16),
                 const Text('Edit Profil', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                 const SizedBox(height: 12),
@@ -128,6 +182,13 @@ class _AkunPageState extends State<AkunPage> {
                   style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
                   icon: const Icon(Icons.logout),
                   label: const Text('KELUAR'),
+                ),
+                const SizedBox(height: 8),
+                TextButton.icon(
+                  onPressed: _hapusAkun,
+                  style: TextButton.styleFrom(foregroundColor: Colors.red),
+                  icon: const Icon(Icons.delete_forever),
+                  label: const Text('HAPUS AKUN'),
                 ),
               ],
             ),

@@ -36,7 +36,13 @@ class AppConfig {
   static const bool useBackend = true;
 
   // ↓ Ganti sesuai mode yang dipakai saat ini
-  static const String baseUrl = 'https://barbershop.seretia.link/api'; // PRODUKSI
+  // Bawaan = PRODUKSI. Untuk uji lokal tanpa mengubah file ini, build dengan:
+  //   flutter build apk --debug --dart-define=BASE_URL=http://localhost:8000/api
+  // (lalu: adb reverse tcp:8000 tcp:8000)
+  static const String baseUrl = String.fromEnvironment(
+    'BASE_URL',
+    defaultValue: 'https://barbershop.seretia.link/api',
+  );
   // static const String baseUrl = 'http://localhost:8000/api'; // MODE 1 (USB)
   // static const String baseUrl = 'http://10.0.2.2:8000/api';   // MODE 2 (Emulator)
   // static const String baseUrl = 'http://192.168.1.X:8000/api'; // MODE 3 (WiFi) ← ganti IP

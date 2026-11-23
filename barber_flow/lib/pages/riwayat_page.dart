@@ -38,7 +38,11 @@ class _RiwayatPageState extends State<RiwayatPage> {
   }
 
   Future<void> _refresh() async {
-    setState(() => _future = _load());
+    // Badan blok (bukan fungsi panah): setState tidak boleh mengembalikan Future,
+    // kalau iya assertion di mode debug membatalkan rebuild dan layar tidak berubah.
+    setState(() {
+      _future = _load();
+    });
     await _future;
   }
 
