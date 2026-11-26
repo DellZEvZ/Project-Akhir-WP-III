@@ -23,15 +23,15 @@ jobs:
           username: ${{ secrets.REGISTRY_USERNAME }}
           password: ${{ secrets.REGISTRY_PASSWORD }}
 
-      - name: Lowercase repository name
-        id: repo_lower
-        run: echo "repo=${GITHUB_REPOSITORY,,}" >> $GITHUB_OUTPUT
-
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: dkr-reg.serenetia.com/${{ steps.repo_lower.outputs.repo }}
+          # Nama image DITETAPKAN (bukan dari nama repo): server menarik nama ini lewat
+          # docker-compose.yml. Dulu nama diambil dari nama repo, sehingga setelah repo
+          # diganti nama menjadi "...-WP-III" image terdorong ke "...-wp-iii" dan server
+          # (yang menarik "...-wp-ii") tidak pernah ter-update. Samakan dengan compose.
+          images: dkr-reg.serenetia.com/dellzevz/project-akhir-wp-ii
           tags: |
             type=sha,prefix=sha-
             type=ref,event=branch
